@@ -1,7 +1,8 @@
+import sys
 from bitstring import BitArray, Bits
 
-def lz77(windowBits, lengthBits):
-    with open("tongueTwister.txt", "rb") as inputFile:
+def lz77(textFile, windowBits, lengthBits):
+    with open(textFile, "rb") as inputFile:
         data = BitArray(inputFile.read())
     compressed = compress(data, windowBits, lengthBits)
     decompressed = decompress(compressed, windowBits, lengthBits)
@@ -93,3 +94,6 @@ def decompress(compressed, windowBits, lengthBits):
             substring = decompressedData[startPos:endPos] + char
             decompressedData += substring
     return decompressedData
+
+if __name__ == "__main__":
+    lz77(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
