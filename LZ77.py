@@ -1,63 +1,95 @@
-def lz77():
-    readFile = open("inputFile.txt", "r")
-    inputString = readFile.read()
-    print(len(inputString));
-    compressed = compress(inputString);
-    print(len(compressed)/8);
-    decompressed = decompress(compressed);
-    if (inputString == decompressed):
-        print("Success");
+from bitstring import BitArray, Bits
+
+def lz77(windowBits, lengthBits):
+    with open("tongueTwister.txt", "rb") as inputFile:
+        data = BitArray(inputFile.read())
+    compressed = compress(data, windowBits, lengthBits)
+    decompressed = decompress(compressed, windowBits, lengthBits)
+    
+    with open("compressed.txt", "wb") as compressedFile:
+       compressed.tofile(compressedFile)
+    with open("decompressed.txt", "wb") as decompressedFile:
+       decompressed.tofile(decompressedFile)
+    
+    print("Data length: {} bits".format(len(data)))
+    print("Compressed length: {} bits".format(len(compressed)))
+    
+    if (data == decompressed):
+        print("Successful compression and decompression")
     else:
-        print("fail");
-def compress(inputString):
-    buffer = inputString;
-    window = "";
-    compressed = "";
-    zero16 = '{0:016b}'.format(0);
-    zero8 = bin(0)[2:].zfill(8);
-    while (len(buffer) != 0):
-        char = buffer[0];  
-        buffer = buffer[1:];
-        if char not in window or len(buffer) == 0:
-            triplet = "00" + char;
-            window += char ;
-            encodedTriplet = zero16 + zero8 + bin(ord(triplet[2]))[2:].zfill(8)
-        else:
-            substring = char;
-            while (substring in window):
-                if (len(buffer) != 0):
-                    substring += buffer[0];
-                    buffer = buffer[1:];
-                else:
-                    break;
-            pos = len(window) - window.find(substring[:-1]);
-            triplet = str(pos) + "," + str(len(substring) - 1) + "," + substring[-1:];
-            length = len(substring) - 1
-            window += (substring);
-            encodedTriplet = '{0:016b}'.format(pos) + bin(length)[2:].zfill(8) + bin(ord(substring[-1:]))[2:].zfill(8)
-        compressed += encodedTriplet;
+        print("Error in compression and decompression")
+
+def compress(data, windowBits, lengthBits):
+    maxWindowLength = 2**windowBits - 1
+    bufferLength = 2**lengthBits - 1
+    buffer = data[:bufferLength]
+    substring = buffer
+    compressed = BitArray()
+    window = BitArray('')
+
+    #constants in the case that a match is not found
+    zeroPos = Bits(uint=0, length=windowBits)
+    zeroLength = Bits(uint=0, length=lengthBits)
+
+    bufferPos = 0
+    maxLength = len(data)
+    while ((bufferPos) < maxLength):
+        bufferExtend = min(bufferPos + bufferLength, maxLength)
+        buffer = data[bufferPos: bufferExtend]
+        bufferStepper = len(buffer) 
+        tripletAdded = False
+        while bufferStepper > 0 and not tripletAdded:
+            substring = buffer[0:bufferStepper]
+            
+            if (window.find(substring) != ()):
+                position =  len(window) - int(window.find(substring)[0])
+                
+                length = len(substring)
+                nextCharIndex = bufferPos + length
+                if nextCharIndex > len(data) - 1:
+                    nextCharIndex -= 1
+                    substring = substring[:-1]
+                    length = len(substring)
+                nextChar = data[nextCharIndex:nextCharIndex+1]
+                
+                bitsPosition = Bits(uint=position, length=windowBits)
+                bitsLength = Bits(uint=length, length=lengthBits)
+
+                compressedTriplet = bitsPosition + bitsLength + nextChar
+                substring += nextChar
+                length += 1
+                tripletAdded = True
+            
+            elif len(substring) == 1:
+                length = 1
+                compressedTriplet = zeroPos + zeroLength + substring
+                tripletAdded = True
+            bufferStepper -= 1
+        bufferPos += length
+        window += substring
+
+        if len(window) > maxWindowLength:
+            startIndex = len(window) -  maxWindowLength
+            window = window[startIndex:]
+        compressed += compressedTriplet
+        
     return compressed
 
-def decompress(compressed):
-    window = "";
-    i = 0;
-    plaintext = ""
-    while i in range(len(compressed) - 9):
-        byte = compressed[i:(i+16)]
-        pos = int(byte, 2);
-        i += 16;
-        byte = compressed[i:(i+8)]
-        length = int(byte, 2);
-        i += 8;
-        byte = compressed[i:(i+8)]
-        char = chr(int(byte, 2));
-        i += 8;
+def decompress(compressed, windowBits, lengthBits):
+    decompressedData = BitArray('')
+    i = 0
+    while i in range(len(compressed)):
+        pos = compressed[i:(i+windowBits)].uint
+        i += windowBits
+        length = compressed[i:(i+lengthBits)].uint
+        i += lengthBits
+        char = compressed[i:(i+1)]
+        i += 1
         if (pos == 0 and length == 0):
-            window += char;
+            decompressedData += char
         else:
-            startPos = len(window) - int(pos)
-            endPos = startPos + int(length)
-            substring = window[startPos:endPos] + char
-            window += substring
-    return window;
-
+            startPos = len(decompressedData) - pos
+            endPos = startPos + length
+            substring = decompressedData[startPos:endPos] + char
+            decompressedData += substring
+    return decompressedData
