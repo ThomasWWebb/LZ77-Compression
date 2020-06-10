@@ -7,7 +7,7 @@ def lz77(textFile, windowBits, lengthBits):
     compressed = compress(data, windowBits, lengthBits)
     decompressed = decompress(compressed, windowBits, lengthBits)
     
-    with open("compressed.txt", "wb") as compressedFile:
+    with open("compressed.bin", "wb") as compressedFile:
        compressed.tofile(compressedFile)
     with open("decompressed.txt", "wb") as decompressedFile:
        decompressed.tofile(decompressedFile)
